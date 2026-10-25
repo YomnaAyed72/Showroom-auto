@@ -1,0 +1,159 @@
+<button class="cart-fab" (click)="cartOpen.set(true)">
+  🛒 Cart <span class="badge">{{ cartCount() }}</span>
+</button>
+
+@if (orderMessage()) {
+  <div class="success">{{ orderMessage() }}</div>
+}
+
+<!-- ===== Filtres ===== -->
+<section class="toolbar">
+  <div class="search">
+    <fa-icon [icon]="faMagnifyingGlass" />
+    <input type="text" placeholder="Search a brand..." #brandInput
+           [value]="brand()" (input)="selectAutos(brandInput.value)">
+  </div>
+
+  <div class="chips">
+    <button class="chip" [class.active]="brand() === ''" (click)="selectAutos('')">All</button>
+    @for (b of brands(); track b) {
+      <button class="chip" [class.active]="brand() === b" (click)="selectAutos(b)">{{ b }}</button>
+    }
+  </div>
+
+  <div class="filters">
+    <div class="field">
+      <label>Max price</label>
+      <div class="input-wrap">
+        <input type="number" min="0" placeholder="e.g. 300" #price
+               [value]="maxPrice() ?? ''" (input)="setMaxPrice(price.value)">
+        <span>k TND</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Min power</label>
+      <div class="input-wrap">
+        <input type="number" min="0" placeholder="e.g. 10" #power
+               [value]="minPower() || ''" (input)="setMinPower(power.value)">
+        <span>HP</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Sort by</label>
+      <select #sort [value]="sortBy()" (change)="setSort(sort.value)">
+        <option value="none">Default</option>
+        <option value="price-asc">Price: low to high</option>
+        <option value="price-desc">Price: high to low</option>
+        <option value="power-desc">Power: high to low</option>
+      </select>
+    </div>
+
+    <label class="switch">
+      <input type="checkbox" #stock [checked]="inStockOnly()" (change)="setInStock(stock.checked)">
+      <span class="slider"></span>
+      <span>In stock only</span>
+    </label>
+
+    <button class="reset" (click)="resetFilters()">Reset</button>
+  </div>
+</section>
+
+<p class="count">{{ selectedAutos().length }} car(s) found</p>
+
+<!-- ===== Liste ===== -->
+<div class="cars-container">
+  @for (auto of selectedAutos(); track auto.id) {
+    <div class="auto-card">
+      <button class="fav" (click)="toggleFavorite(auto.id)">
+        {{ isFavorite(auto.id) ? '♥' : '♡' }}
+      </button>
+
+      <img [src]="`photos/${auto.photo}`" [alt]="auto.model">
+
+      <div class="details">
+        <h3>{{ auto.brand }} {{ auto.model }}</h3>
+        <p class="specs">{{ auto.power }} HP</p>
+        <p class="price">{{ auto.price }},000 TND</p>
+        @if (remaining(auto) > 0) {
+          <p class="stock">Only {{ remaining(auto) }} in stock</p>
+        } @else {
+          <p class="sold-out">Sold out</p>
+        }
+      </div>
+
+      <div class="actions">
+        <button class="secondary" (click)="selectCar(auto)">See more</button>
+        <button class="primary" (click)="addToCart(auto)" [disabled]="remaining(auto) === 0">
+          {{ remaining(auto) === 0 ? 'Sold out' : 'Add to cart' }}
+        </button>
+      </div>
+
+      <label class="compare-check">
+        <input type="checkbox" [checked]="isCompared(auto.id)" (change)="toggleCompare(auto.id)">
+        Compare
+      </label>
+    </div>
+  } @empty {
+    <p class="empty">No car matches your filters.</p>
+  }
+</div>
+
+<!-- ===== Comparateur ===== -->
+@if (comparedAutos().length === 2) {
+  <div class="compare">
+    <h2>Comparison</h2>
+    <table>
+      <tr>
+        <th></th>
+        <th>{{ comparedAutos()[0].brand }} {{ comparedAutos()[0].model }}</th>
+        <th>{{ comparedAutos()[1].brand }} {{ comparedAutos()[1].model }}</th>
+      </tr>
+      <tr><td>Price (k TND)</td><td>{{ comparedAutos()[0].price }}</td><td>{{ comparedAutos()[1].price }}</td></tr>
+      <tr><td>Power (HP)</td><td>{{ comparedAutos()[0].power }}</td><td>{{ comparedAutos()[1].power }}</td></tr>
+      <tr><td>In stock</td><td>{{ remaining(comparedAutos()[0]) }}</td><td>{{ remaining(comparedAutos()[1]) }}</td></tr>
+    </table>
+    <button class="secondary" (click)="clearCompare()">Close comparison</button>
+  </div>
+} @else if (comparedAutos().length === 1) {
+  <p class="hint">Select one more car to compare.</p>
+}
+
+<!-- ===== Panier ===== -->
+@if (cartOpen()) {
+  <div class="overlay overlay-right">
+    <aside class="drawer">
+      <div class="drawer-head">
+        <h2>Your cart</h2>
+        <button class="close" (click)="cartOpen.set(false)">✕</button>
+      </div>
+
+      @for (item of cart(); track item.auto.id) {
+        <div class="cart-row">
+          <img [src]="`photos/${item.auto.photo}`" [alt]="item.auto.model">
+          <div class="info">
+            <strong>{{ item.auto.brand }} {{ item.auto.model }}</strong>
+            <span>{{ item.auto.price }},000 TND</span>
+          </div>
+          <div class="qty">
+            <button (click)="decrease(item.auto)">−</button>
+            <span>{{ item.qty }}</span>
+            <button (click)="addToCart(item.auto)" [disabled]="remaining(item.auto) === 0">+</button>
+          </div>
+          <button class="remove" (click)="removeFromCart(item.auto)">🗑</button>
+        </div>
+      } @empty {
+        <p class="empty">Your cart is empty.</p>
+      }
+
+      @if (cart().length > 0) {
+        <div class="drawer-foot">
+          <div class="total"><span>Total</span><strong>{{ cartTotal() }},000 TND</strong></div>
+          <button class="primary full" (click)="confirmOrder(); cartOpen.set(false)">Confirm order</button>
+          <button class="secondary full" (click)="clearCart()">Clear cart</button>
+        </div>
+      }
+    </aside>
+  </div>
+}
